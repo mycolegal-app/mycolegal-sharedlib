@@ -1,0 +1,46 @@
+{
+  "name": "@mycolegal-app/sharedlib",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./index.ts",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mycolegal-app/mycolegal-sharedlib.git"
+  },
+  "files": [
+    "src",
+    "index.ts",
+    "tsconfig.json",
+    "VERSION.md"
+  ],
+  "peerDependencies": {
+    "@prisma/client": ">=5",
+    "jose": ">=5",
+    "next": ">=14",
+    "zod": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "@prisma/client": {
+      "optional": true
+    },
+    "jose": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.19.17",
+    "typescript": "^6.0.2"
+  },
+  "description": "Código no-gráfico compartido entre apps de usuario final de MycoLegal (auth, api utils, prisma helpers, proxies, etc.). Hermano de @mycolegal-app/ui."
+}
