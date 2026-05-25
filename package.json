@@ -1,6 +1,6 @@
 {
   "name": "@mycolegal-app/sharedlib",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "main": "./index.ts",
   "publishConfig": {
@@ -15,6 +15,8 @@
     "src",
     "config.ts",
     "proxy.ts",
+    "db.ts",
+    "inter-auth.ts",
     "index.ts",
     "tsconfig.json",
     "VERSION.md"
