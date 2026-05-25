@@ -13,6 +13,8 @@
   },
   "files": [
     "src",
+    "config.ts",
+    "proxy.ts",
     "index.ts",
     "tsconfig.json",
     "VERSION.md"
