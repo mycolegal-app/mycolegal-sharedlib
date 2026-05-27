@@ -1,5 +1,22 @@
 # mycolegal-sharedlib — Changelog
 
+## 0.3.0 — Tier-1 quick wins: org-apps + safe-transaction + auth-client (2026-05-27)
+
+- `org-apps.ts`: `getEnabledAppSlugs` + `isAppEnabled` con cache 60s, byte-idéntico
+  en 6 apps (actas, archivo, cancelaciones, legifirma, notaria, peticiones).
+  Reusa `./config` (AUTH_INTERNAL_URL, JWT_COOKIE_NAME) y `next/headers`.
+- `safe-transaction.ts`: `safeTransaction` (retry P2034/P2002, backoff exponencial,
+  Serializable por defecto), byte-idéntico en legifirma + notaria. Usa el singleton
+  `prisma` de `./db` (la misma instancia que las apps re-exportan como `@/lib/db`).
+- `auth-client.ts`: `refreshToken` + `fetchUserProfile` (+ tipos `TokenRefreshResponse`
+  /`AuthUserProfile`), byte-idéntico en legifirma + notaria. Único cambio respecto al
+  original: import `@/lib/config` → `./config`.
+- Añadidos a `files` y a los fingerprints de deploy (`SHAREDLIB_PUBLISHED_PATHS` en
+  platform/scripts/common.sh + lista de `repo_src_paths` en admin.sh).
+- Consumidores re-exportan desde `@/lib/{org-apps,safe-transaction,auth-client}`
+  (sin tocar imports existentes). Bump de package.json/package-lock vía
+  `publish-sharedlib.sh`.
+
 ## 0.2.0 — Tier-1: db + inter-auth (2026-05-25)
 
 - `db.ts`: singleton de `PrismaClient` (`prisma`), byte-idéntico en las 10 apps.
