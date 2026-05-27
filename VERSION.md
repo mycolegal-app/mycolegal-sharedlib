@@ -1,5 +1,22 @@
 # mycolegal-sharedlib — Changelog
 
+## 0.4.0 — Tier-2: data-scope (2026-05-27)
+
+- `data-scope.ts`: filtrado por usuario para queries Prisma (`isBypassUser`,
+  `dataScopeWhere`, `mergeDataScopeWhere` + tipos `DataScopeAuth`/`DataScopeOptions`).
+  Módulo PURO (sin imports de Prisma/Next). Core byte-idéntico en 8 apps; se publica
+  como **superset**: incorpora la opción `mine?` de cross-visibility (solo lectura)
+  que tenía notaria, y tipa `appRole` como `string` (no `AppRole`) para no acoplar
+  sharedlib a ningún schema. Backward-compatible: `mine` por defecto es el
+  comportamiento histórico (solo creados/asignados).
+- Consumidores (10) re-exportan desde `@/lib/data-scope`. **archivo** conserva su
+  `mergePeticionScopeWhere` local (ArchivoPeticion no tiene `asignadoId` propio: el
+  asignado vive en ArchivoTarea). **notaria** abandona su fork.
+- Tests: `data-scope.test.ts` (cancelaciones/legifirma/moratorias idénticos + notaria
+  superset) se quedan en cada app y testean a través del re-export. Vitest v4
+  transpila el TS crudo de sharedlib desde node_modules sin `deps.inline`.
+- Añadido a `files` y a los fingerprints de deploy (common.sh + admin.sh).
+
 ## 0.3.0 — Tier-1 quick wins: org-apps + safe-transaction + auth-client (2026-05-27)
 
 - `org-apps.ts`: `getEnabledAppSlugs` + `isAppEnabled` con cache 60s, byte-idéntico
