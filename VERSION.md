@@ -1,5 +1,23 @@
 # mycolegal-sharedlib — Changelog
 
+## 0.5.0 — Tier-2: api (helpers de respuesta + paginación, reconciliados) (2026-05-27)
+
+- `api.ts`: helpers puros para route handlers — `successResponse`, `errorResponse`,
+  `parseSearchParams`, `getPaginationParams`, `buildPaginationMeta` + tipos
+  `PaginationMeta`/`ApiResponse`/`ApiError`/`ParsedSearchParams`. Reconciliados desde
+  el `api-utils.ts` de las 10 apps: las diferencias eran tipado/formato salvo el clamp
+  de paginación, donde este canónico es la versión robusta (guards de NaN + clamp de
+  mín/máx) — estricta mejora, sin cambio para tráfico legítimo. `sortBy` se unifica a
+  `string` (default `'createdAt'`); las 3 apps con la variante nullable no lo usaban.
+- **NO se mueven** los wrappers `withAuth`/`withPermission` (+ variantes:
+  withWritePermission/withCatalogPermission/withGestorAuth) ni `hasPerm`: atan
+  `getAuthContext` y la capa de permisos (ROLE_PERMISSIONS / hasPermission /
+  hasPermissionFromList / hasPermissionForRole), app-specific. Se quedan en cada
+  `api-utils.ts`, que ahora re-exporta los helpers compartidos e importa `errorResponse`.
+- legifirma mantiene `PaginationMeta`/`ApiResponse`/`ApiError` en `@/types`
+  (estructuralmente idénticos → compatibles por tipado estructural).
+- Añadido a `files` y a los fingerprints de deploy (common.sh + admin.sh).
+
 ## 0.4.0 — Tier-2: data-scope (2026-05-27)
 
 - `data-scope.ts`: filtrado por usuario para queries Prisma (`isBypassUser`,
