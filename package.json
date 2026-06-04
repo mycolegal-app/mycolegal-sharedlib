@@ -1,6 +1,6 @@
 {
   "name": "@mycolegal-app/sharedlib",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "main": "./index.ts",
   "publishConfig": {
@@ -22,17 +22,22 @@
     "auth-client.ts",
     "data-scope.ts",
     "api.ts",
+    "storage.ts",
     "index.ts",
     "tsconfig.json",
     "VERSION.md"
   ],
   "peerDependencies": {
+    "@google-cloud/storage": ">=7",
     "@prisma/client": ">=5",
     "jose": ">=5",
     "next": ">=14",
     "zod": ">=3"
   },
   "peerDependenciesMeta": {
+    "@google-cloud/storage": {
+      "optional": true
+    },
     "@prisma/client": {
       "optional": true
     },
