@@ -1,6 +1,6 @@
 {
   "name": "@mycolegal-app/sharedlib",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "type": "module",
   "main": "./index.ts",
   "publishConfig": {
@@ -21,6 +21,7 @@
     "safe-transaction.ts",
     "auth-client.ts",
     "data-scope.ts",
+    "permission-resolver.ts",
     "api.ts",
     "storage.ts",
     "index.ts",
