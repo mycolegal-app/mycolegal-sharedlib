@@ -67,6 +67,14 @@ export interface DataScopeOptions {
    * se llaman sin `mine` para mantener el scope estricto.
    */
   mine?: boolean;
+  /**
+   * Fuerza el filtro personal (creador/asignado = yo) AUNQUE el usuario tenga
+   * bypass (#206). Por defecto un bypass (NOTARIO/org_admin) ve toda la org;
+   * pásalo `true` cuando ese usuario pide explícitamente "ver solo lo mío"
+   * (p.ej. marcando el toggle "Ver mis…"). Tiene prioridad sobre el bypass y
+   * sobre `mine`. Las llamadas que no lo pasan no cambian de comportamiento.
+   */
+  forceMine?: boolean;
 }
 
 /**
@@ -96,9 +104,14 @@ export function dataScopeWhere(
   auth: DataScopeAuth,
   opts: DataScopeOptions = {},
 ): Record<string, unknown> | null {
-  if (isBypassUser(auth)) return null;
-  // Cross-visibility (solo lectura): el caller pide explícitamente toda la org.
-  if (opts.mine === false) return null;
+  // `forceMine` (#206): el usuario pide explícitamente "solo lo mío" aunque
+  // tenga bypass → saltamos los cortes de bypass y de `mine:false` y caemos al
+  // filtro personal. Sin él, el comportamiento histórico se mantiene intacto.
+  if (!opts.forceMine) {
+    if (isBypassUser(auth)) return null;
+    // Cross-visibility (solo lectura): el caller pide explícitamente toda la org.
+    if (opts.mine === false) return null;
+  }
 
   const creadoPor = opts.creadoPorField ?? 'creadoPorId';
   const asignado = opts.asignadoField === undefined ? 'asignadoId' : opts.asignadoField;
