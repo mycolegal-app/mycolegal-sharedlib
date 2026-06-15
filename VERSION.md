@@ -1,5 +1,15 @@
 # mycolegal-sharedlib — Changelog
 
+## 0.6.0 — app-roles: catálogo unificado B2B (#78) centralizado (2026-06-15)
+
+- `app-roles.ts`: `addUnifiedB2BRoles(appRoles, options)` centraliza el bloque
+  `APP_ROLES.push(ADMINISTRADOR_NOTARIA / USUARIO_NOTARIA / OBSERVADOR_NOTARIA /
+  CONTABLE_NOTARIA)` que estaba copiado a mano en ~7 instrumentations. Opciones
+  `adminFrom`/`usuarioFrom`/`observadorFrom`/`includeObservador`/`includeContable`
+  reproducen exactamente cada variante. Adoptado en archivo, cancelaciones, actas,
+  peticiones, moratorias y consultor. (notaria define los roles inline con otra
+  estructura → no migrada; docfilling no cablea sharedlib → diferida.)
+
 ## 0.5.0 — Tier-2: api (helpers de respuesta + paginación, reconciliados) (2026-05-27)
 
 - `api.ts`: helpers puros para route handlers — `successResponse`, `errorResponse`,
