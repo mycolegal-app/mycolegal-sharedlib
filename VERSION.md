@@ -1,5 +1,19 @@
 # mycolegal-sharedlib — Changelog
 
+## 0.7.0 — global-settings: lectura de parámetros globales desde las apps (2026-06-20)
+
+- `global-settings.ts`: lado de LECTURA del catálogo `ConfiguracionGlobal`
+  (clave→valor GLOBAL, versionado, editable por SuperAdmin en Admin → Datos
+  globales). `getGlobalSettingRaw/Number/Boolean/Json(db, clave, fallback?, fecha?)`
+  resuelven el valor efectivo (max `vigenciaDesde` ≤ fecha) leyendo directo por
+  Prisma — las apps de negocio comparten la BD `mycolegal_app` con platform — y
+  caen al `fallback` del consumidor (su constante legal de respaldo) si la org no
+  ha fijado valor. Mismo enfoque que `resolverImpuesto`. El lado de ESCRITURA y el
+  registro de claves siguen en platform (`global-settings-registry.ts`).
+- Consumidor: la app debe declarar el modelo `ConfiguracionGlobal` en su
+  `schema.prisma` (solo `prisma generate`; la migración la posee platform).
+  Primeros usos: escala nº2 del arancel (`arancel.escalaN2`) en legifirma/notaria.
+
 ## 0.6.0 — app-roles: catálogo unificado B2B (#78) centralizado (2026-06-15)
 
 - `app-roles.ts`: `addUnifiedB2BRoles(appRoles, options)` centraliza el bloque
