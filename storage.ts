@@ -1,5 +1,19 @@
 import { Storage } from '@google-cloud/storage';
 import { createHash } from 'crypto';
+import { Agent } from 'node:https';
+
+/**
+ * Cloud Run con `vpc-egress=all-traffic`: el NAT cierra sockets TCP ociosos y
+ * con keep-alive las llamadas de googleapis fallan con `ERR_STREAM_PREMATURE_CLOSE`
+ * ("Premature close"). En GCS esto rompe la **firma V4 sin clave privada** (SA de
+ * compute), que llama a `iamcredentials.googleapis.com/...:signBlob` a través del
+ * transporter del auth client → "Invalid response body ... signBlob: Premature close".
+ *
+ * Igual que en auth/consultor, desactivamos keep-alive en ese transporter. Lo
+ * inyectamos vía `clientOptions.transporterOptions.agent`, que GoogleAuth propaga
+ * al auth client (Compute/etc.) que realiza el signBlob, no sólo a las llamadas a GCS.
+ */
+const noKeepAliveAgent = new Agent({ keepAlive: false });
 
 /**
  * StorageService compartido — cliente GCS unificado para todas las apps.
@@ -138,6 +152,9 @@ export function createStorageClient(config: StorageClientConfig): StorageClient 
         storage = new Storage({
           projectId: config.projectId || undefined,
           keyFilename: config.keyFilename || undefined,
+          // Desactiva keep-alive en el transporter del auth client → evita el
+          // `Premature close` del signBlob al firmar URLs V4 desde Cloud Run.
+          clientOptions: { transporterOptions: { agent: noKeepAliveAgent } },
         });
       }
       return storage;
