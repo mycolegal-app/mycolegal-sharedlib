@@ -11,11 +11,20 @@ export const AUTH_INTERNAL_URL =
 /** Shared secret for HS256 JWT verification (must match auth service) */
 export const JWT_SECRET = process.env.JWT_SECRET || '';
 
+/**
+ * Optional cookie-name prefix for environment isolation. Empty in prod (no-op),
+ * `test-` in the preprod fleet (`*.test.mycolegal.app`) so a prod cookie that
+ * domain-matches a `*.test` host can't collide with the test cookie of the same
+ * name. Read at RUNTIME (like JWT_SECRET) so the same image works in prod and
+ * test (build-once-promote).
+ */
+export const COOKIE_PREFIX = process.env.COOKIE_PREFIX || '';
+
 /** Shared cookie name for SSO across all mycolegal apps */
-export const JWT_COOKIE_NAME = 'mycolegal-token';
+export const JWT_COOKIE_NAME = `${COOKIE_PREFIX}mycolegal-token`;
 
 /** Refresh token cookie name */
-export const REFRESH_COOKIE_NAME = 'mycolegal-refresh';
+export const REFRESH_COOKIE_NAME = `${COOKIE_PREFIX}mycolegal-refresh`;
 
 /** Cookie domain for cross-app SSO (localhost for Docker, .mycolegal.app for prod) */
 export const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN || undefined;
