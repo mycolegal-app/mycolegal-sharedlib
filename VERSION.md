@@ -1,5 +1,12 @@
 # mycolegal-sharedlib — Changelog
 
+##  — Fixes prod (2026-06-29)
+
+Type: **revision**
+
+
+
+
 ## 0.7.0 — global-settings: lectura de parámetros globales desde las apps (2026-06-20)
 
 - `global-settings.ts`: lado de LECTURA del catálogo `ConfiguracionGlobal`
