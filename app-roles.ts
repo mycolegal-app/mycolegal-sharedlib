@@ -18,6 +18,13 @@ export interface AppRoleEntry {
   label: string;
   description: string;
   isDefault: boolean;
+  /**
+   * Rol que recibe por auto-provisión un usuario `org_admin` de la org (en vez
+   * del `isDefault`, pensado para usuarios normales). Sin esto, un org_admin
+   * entraba en cada app como usuario raso y le faltaban permisos de admin
+   * (p.ej. `peticiones:manage_externos`). Solo ADMINISTRADOR_NOTARIA lo lleva.
+   */
+  isAdminDefault?: boolean;
   permissions: string[];
 }
 
@@ -61,6 +68,7 @@ export function addUnifiedB2BRoles(
       label: 'Administrador de notaría',
       description: 'Acceso completo y administra usuarios y configuración',
       isDefault: false,
+      isAdminDefault: true,
       permissions: permsOf(adminFrom),
     },
     {
