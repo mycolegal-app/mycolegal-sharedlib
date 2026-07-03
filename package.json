@@ -1,6 +1,6 @@
 {
   "name": "@mycolegal-app/sharedlib",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "type": "module",
   "main": "./index.ts",
   "publishConfig": {
@@ -26,6 +26,7 @@
     "app-roles.ts",
     "api.ts",
     "storage.ts",
+    "drive.ts",
     "index.ts",
     "tsconfig.json",
     "VERSION.md"

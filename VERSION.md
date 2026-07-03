@@ -1,5 +1,20 @@
 # mycolegal-sharedlib — Changelog
 
+## 0.9.0 — drive: catálogo unificado de ficheros (Unidad de Red) (2026-07-03)
+
+Type: **minor**
+
+- `drive.ts`: helper del **catálogo unificado** (`DriveNode` ampliado) — chokepoint
+  único para altas/carpetas/movimientos/borrados, de modo que catálogo y GCS no
+  divergen. Coexiste con la tabla de dominio de cada app (misma tx).
+  - `storeFile(db, storage, input)` — sube (bytes) o registra (gcsPath) + `mkdir -p`
+    + upsert idempotente por `gcsPath`; áreas DOCUMENTS/SHARED/PERSONAL.
+  - `linkExisting(...)` — cataloga un objeto GCS ya existente **sin subir** (backfill legacy).
+  - `mkdir`, `ensureFolderChain`, `moveNode`, `trashNode`/`restoreNode`, `deleteFileNode`.
+  - Tipado con delegate estructural mínimo (`DriveDb`/`DriveNodeDelegate`) → compatible
+    con el cliente Prisma de cada app (peer opcional).
+  - Plan: `mycolegal-platform/PLAN_TECNICO_UNIDAD_ARCHIVO.md`.
+
 ## 0.8.0 — storage: contabilidad de almacenamiento (2026-07-02)
 
 Type: **minor**
