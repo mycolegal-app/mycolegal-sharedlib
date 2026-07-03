@@ -1,5 +1,25 @@
 # mycolegal-sharedlib — Changelog
 
+## 0.8.0 — storage: contabilidad de almacenamiento (2026-07-02)
+
+Type: **minor**
+
+- `storage.ts`: el cliente GCS compartido pasa a ser el punto contable único del
+  almacenamiento facturable. Nuevos hooks en `StorageClientConfig`:
+  - `onUsageDelta(delta)` — callback best-effort que reporta cada delta de bytes;
+    normalmente se cablea con `createStorageUsageReporter` → `POST /internal/storage/record`.
+  - `resolveOrgId(path, bucket)` — atribuye el objeto a una org (o `null` = no
+    facturable: plantillas/incidencias).
+- Se contabiliza en: `uploadBuffer` (+size, server-side), `delete` (−size, lee la
+  metadata antes de borrar) y el NUEVO `confirmUpload({path, bucket?, orgId?})`, que
+  para subidas por signed-URL (navegador→GCS directo) lee el tamaño real vía
+  `getMetadata` y emite `reason:'confirm'`. `getSignedUrl` NO contabiliza (los bytes
+  llegan luego con el PUT; el conteo lo cierra `confirmUpload`).
+- `orgId` explícito opcional en upload/delete/confirm (si se omite, `resolveOrgId`).
+- Helper nuevo exportado: `createStorageUsageReporter({ platformUrl, serviceKey, app })`.
+- Aditivo y retrocompatible: sin `onUsageDelta` el cliente no contabiliza (apps sin
+  facturación de storage siguen igual).
+
 ##  — Fixes prod (2026-06-29)
 
 Type: **revision**

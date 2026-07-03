@@ -35,6 +35,18 @@ const noKeepAliveAgent = new Agent({ keepAlive: false });
  * en @google-cloud/storage v7.
  */
 
+/** Motivo de un delta de almacenamiento (para el libro mayor de platform). */
+export type StorageUsageReason = 'upload' | 'confirm' | 'delete' | 'reconcile' | 'adjust';
+
+export interface StorageUsageDelta {
+  orgId: string;
+  /** + al subir/confirmar, − al borrar. */
+  deltaBytes: number;
+  gcsPath: string;
+  bucket: string;
+  reason: StorageUsageReason;
+}
+
 export interface StorageClientConfig {
   /** Bucket por defecto para todas las operaciones. */
   bucket: string;
@@ -47,6 +59,20 @@ export interface StorageClientConfig {
    * presente, el cliente no exige credenciales. Vacío en GCP → SA por defecto.
    */
   apiEndpoint?: string;
+  /**
+   * Contabilidad de almacenamiento (opcional). Se invoca best-effort tras cada
+   * upload server-side, `confirmUpload` (subidas por signed-URL) y delete. La app
+   * la cablea normalmente con `createStorageUsageReporter` → POST /internal/storage/record.
+   * Si se omite, el cliente NO contabiliza (apps sin facturación de storage).
+   */
+  onUsageDelta?: (delta: StorageUsageDelta) => Promise<void>;
+  /**
+   * Resuelve el `orgId` a partir del path (y bucket) del objeto, para atribuir el
+   * delta. Devolver `null` = objeto no facturable (p.ej. plantillas compartidas o
+   * incidencias) → no se contabiliza. Solo se usa cuando la operación no recibe un
+   * `orgId` explícito. Cada app aporta su convención (`{orgId}/…`, `orgs/{orgId}/…`).
+   */
+  resolveOrgId?: (path: string, bucket: string) => string | null;
 }
 
 export interface OpResult {
@@ -92,6 +118,20 @@ export interface UploadOptions {
   /** Metadatos GCS extra (p.ej. `cacheControl`). */
   metadata?: Record<string, string>;
   bucket?: string;
+  /** Contabilidad: orgId explícito (si se omite, se usa `resolveOrgId`). */
+  orgId?: string;
+}
+
+export interface ConfirmUploadOptions {
+  path: string;
+  bucket?: string;
+  /** Contabilidad: orgId explícito (si se omite, se usa `resolveOrgId`). */
+  orgId?: string;
+}
+
+export interface ConfirmUploadResult extends OpResult {
+  /** Tamaño real del objeto en GCS (bytes), leído de la metadata. */
+  size?: number;
 }
 
 export interface VersionInfo {
@@ -112,10 +152,16 @@ export interface StorageClient {
   getSignedUrl(opts: SignOptions): Promise<SignResult>;
   /** Sube un buffer (flujo server-side; el directo preferido es signed URL). */
   uploadBuffer(opts: UploadOptions): Promise<UploadResult>;
+  /**
+   * Confirma una subida hecha por signed-URL (navegador→GCS directo): lee el
+   * tamaño real del objeto vía `getMetadata` y contabiliza el delta (`reason:'confirm'`).
+   * Debe llamarse desde el endpoint de confirmación tras el PUT del cliente.
+   */
+  confirmUpload(opts: ConfirmUploadOptions): Promise<ConfirmUploadResult>;
   /** Descarga el objeto como Buffer (flujo server-side; preferir signed URL). */
   download(path: string, opts?: { bucket?: string; generation?: string }): Promise<DownloadResult>;
-  /** Borra un objeto. Best-effort: false si no se pudo. */
-  delete(path: string, opts?: { bucket?: string }): Promise<boolean>;
+  /** Borra un objeto. Best-effort: false si no se pudo. Contabiliza el delta negativo. */
+  delete(path: string, opts?: { bucket?: string; orgId?: string }): Promise<boolean>;
   /** ¿Existe el objeto (versión actual)? */
   exists(path: string, opts?: { bucket?: string }): Promise<boolean>;
   /**
@@ -171,6 +217,28 @@ export function createStorageClient(config: StorageClientConfig): StorageClient 
     return { name };
   }
 
+  /**
+   * Contabiliza un delta de bytes (best-effort, NUNCA lanza). Resuelve el orgId
+   * del `orgId` explícito o de `resolveOrgId`; si no hay atribución (objeto no
+   * facturable: plantillas, incidencias) o no hay reporter, no hace nada.
+   */
+  async function emitUsage(
+    reason: StorageUsageReason,
+    path: string,
+    bucket: string,
+    deltaBytes: number,
+    explicitOrgId?: string,
+  ): Promise<void> {
+    if (!config.onUsageDelta || deltaBytes === 0) return;
+    const orgId = explicitOrgId ?? config.resolveOrgId?.(path, bucket) ?? null;
+    if (!orgId) return;
+    try {
+      await config.onUsageDelta({ orgId, deltaBytes, gcsPath: path, bucket, reason });
+    } catch (e) {
+      console.warn('[storage] usage report failed:', e instanceof Error ? e.message : e);
+    }
+  }
+
   return {
     enabled() {
       return !!config.bucket && getStorage() !== null;
@@ -222,9 +290,25 @@ export function createStorageClient(config: StorageClientConfig): StorageClient 
             metadata: { cacheControl: 'private, max-age=0', ...(opts.metadata ?? {}) },
           });
         const sha256 = createHash('sha256').update(opts.buffer).digest('hex');
+        await emitUsage('upload', opts.path, b.name, opts.buffer.length, opts.orgId);
         return { ok: true, gcsUri: `gs://${b.name}/${opts.path}`, size: opts.buffer.length, sha256 };
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : 'upload failed' };
+      }
+    },
+
+    async confirmUpload(opts) {
+      const s = getStorage();
+      if (!s) return { ok: false, error: storageError ?? 'GCS not configured' };
+      const b = resolveBucket(opts.bucket);
+      if ('error' in b) return { ok: false, error: b.error };
+      try {
+        const [meta] = await s.bucket(b.name).file(opts.path).getMetadata();
+        const size = Number(meta.size ?? 0);
+        await emitUsage('confirm', opts.path, b.name, size, opts.orgId);
+        return { ok: true, size };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : 'confirm failed' };
       }
     },
 
@@ -249,7 +333,19 @@ export function createStorageClient(config: StorageClientConfig): StorageClient 
       const b = resolveBucket(opts?.bucket);
       if (!s || 'error' in b) return false;
       try {
+        // Tamaño ANTES de borrar (para el delta negativo). Si el objeto ya no
+        // existe, size=0 y no se contabiliza nada.
+        let size = 0;
+        if (config.onUsageDelta) {
+          try {
+            const [meta] = await s.bucket(b.name).file(path).getMetadata();
+            size = Number(meta.size ?? 0);
+          } catch {
+            size = 0;
+          }
+        }
         await s.bucket(b.name).file(path).delete({ ignoreNotFound: true });
+        if (size > 0) await emitUsage('delete', path, b.name, -size, opts?.orgId);
         return true;
       } catch (e) {
         console.warn('[storage] delete failed:', e instanceof Error ? e.message : e);
@@ -306,5 +402,35 @@ export function createStorageClient(config: StorageClientConfig): StorageClient 
         return { ok: false, error: e instanceof Error ? e.message : 'restore failed' };
       }
     },
+  };
+}
+
+export interface StorageUsageReporterConfig {
+  /** Base URL interna de mycolegal-platform. */
+  platformUrl: string;
+  /** X-Service-Key (APPS_REGISTER_SECRET). */
+  serviceKey: string;
+  /** appSlug de quien consume (atribución por app en el libro mayor). */
+  app: string;
+}
+
+/**
+ * Construye el callback `onUsageDelta` que reporta los deltas de almacenamiento a
+ * platform (`POST /internal/storage/record`). Best-effort: si la llamada falla se
+ * propaga la excepción para que `emitUsage` la registre sin romper la operación.
+ *
+ * Uso: `createStorageClient({ bucket, onUsageDelta: createStorageUsageReporter({...}), resolveOrgId })`.
+ */
+export function createStorageUsageReporter(
+  config: StorageUsageReporterConfig,
+): (delta: StorageUsageDelta) => Promise<void> {
+  const base = config.platformUrl.replace(/\/$/, '');
+  return async (delta) => {
+    const res = await fetch(`${base}/internal/storage/record`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Service-Key': config.serviceKey },
+      body: JSON.stringify({ ...delta, app: config.app }),
+    });
+    if (!res.ok) throw new Error(`storage/record → ${res.status}`);
   };
 }
