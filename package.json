@@ -1,6 +1,6 @@
 {
   "name": "@mycolegal-app/sharedlib",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "type": "module",
   "main": "./index.ts",
   "publishConfig": {
@@ -27,6 +27,7 @@
     "api.ts",
     "storage.ts",
     "drive.ts",
+    "text-extract.ts",
     "index.ts",
     "tsconfig.json",
     "VERSION.md"
@@ -55,7 +56,9 @@
       "optional": true
     }
   },
-  "dependencies": {},
+  "dependencies": {
+    "unpdf": "^1.6.2"
+  },
   "devDependencies": {
     "@types/node": "^22.19.17",
     "typescript": "^6.0.2"
