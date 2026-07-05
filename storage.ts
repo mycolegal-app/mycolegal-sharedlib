@@ -415,11 +415,14 @@ export interface StorageUsageReporterConfig {
 }
 
 /**
- * Construye el callback `onUsageDelta` que reporta los deltas de almacenamiento a
- * platform (`POST /internal/storage/record`). Best-effort: si la llamada falla se
- * propaga la excepción para que `emitUsage` la registre sin romper la operación.
+ * @deprecated NO USAR. El endpoint `POST /internal/storage/record` fue RETIRADO:
+ * la contabilidad de almacenamiento pasó al catálogo `DriveNode` (`getUsage` en
+ * platform = Σ `DriveNode.sizeBytes`; ver PLAN_TECNICO_UNIDAD_ARCHIVO §9). Las
+ * subidas se contabilizan al escribir el nodo del catálogo, no por delta. Se
+ * conserva la firma solo para no romper builds hasta el próximo bump de sharedlib
+ * que la elimine; cablearla hoy solo genera POSTs 404.
  *
- * Uso: `createStorageClient({ bucket, onUsageDelta: createStorageUsageReporter({...}), resolveOrgId })`.
+ * Construye el callback `onUsageDelta` que reportaba los deltas a platform.
  */
 export function createStorageUsageReporter(
   config: StorageUsageReporterConfig,
