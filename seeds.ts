@@ -64,7 +64,9 @@ export async function runStartupSeeds(
         where: { name: { in: names } },
         select: { name: true, version: true },
       });
-      const byName = new Map(rows.map((r: { name: string; version: number }) => [r.name, r]));
+      const byName = new Map<string, { name: string; version: number }>(
+        rows.map((r: { name: string; version: number }) => [r.name, r]),
+      );
       const anyPending = units.some((u) => {
         const prev = byName.get(u.name);
         return u.once ? !prev : !prev || prev.version < u.version;
