@@ -53,6 +53,29 @@ export async function runStartupSeeds(
   const log = opts.log ?? ((m: string) => console.log(`[seeds] ${m}`));
   if (!units.length) return { applied: [], skipped: [] };
   const forceSet = new Set(opts.force ?? []);
+  const names = units.map((u) => u.name);
+
+  // Pre-check barato (sin lock ni tx de escritura): en régimen normal el arranque
+  // solo hace UN read y sale. Solo si hay algo pendiente (o `force`) abrimos la
+  // transacción con advisory lock. Reduce overhead y locks retenidos en autoscale.
+  if (forceSet.size === 0) {
+    try {
+      const rows = await prisma.seedState.findMany({
+        where: { name: { in: names } },
+        select: { name: true, version: true },
+      });
+      const byName = new Map(rows.map((r: { name: string; version: number }) => [r.name, r]));
+      const anyPending = units.some((u) => {
+        const prev = byName.get(u.name);
+        return u.once ? !prev : !prev || prev.version < u.version;
+      });
+      if (!anyPending) return { applied: [], skipped: names };
+    } catch {
+      // Tabla aún inexistente (primer boot antes de la migración) o error de
+      // lectura: caemos al camino con tx, que también lo captura sin lanzar.
+    }
+  }
+
   try {
     return await prisma.$transaction(
       async (tx: any): Promise<SeedRunSummary> => {
