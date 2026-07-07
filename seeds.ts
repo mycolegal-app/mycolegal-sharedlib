@@ -1,0 +1,70 @@
+// Motor de seeds idempotentes ejecutados en el ARRANQUE del servicio (decisión
+// jul-2026: sustituir el modelo de "seed vía endpoint disparado a mano").
+//
+// Dos clases de unidad:
+//  - L1 (ensure-exists): sin `once`. Re-corre cuando sube `version`. Semántica
+//    create-if-absent; nunca muta/reactiva/borra lo que el admin haya tocado.
+//  - L2 (provisión de entorno): `once: true`. Corre SOLO si nunca se aplicó. Un
+//    bump de versión NO lo re-dispara → nunca resucita datos borrados a posteriori.
+//
+// Garantías del runner:
+//  1. Serializado entre instancias de Cloud Run vía advisory lock de Postgres
+//     (`pg_advisory_xact_lock`), que se libera solo al cerrar la transacción.
+//  2. Idempotencia + versionado en la tabla `SeedState` (cada app la declara).
+//  3. NUNCA lanza: un fallo de seed (o la tabla aún inexistente en el primer boot
+//     antes del `db push`) no debe tumbar el arranque; se reintenta en el siguiente.
+
+export interface SeedUnit {
+  /** Clave estable (única por app). Se persiste en SeedState.name. */
+  name: string;
+  /** Versión del contenido. En L1, subirla re-ejecuta la unidad. */
+  version: number;
+  /** L2: true = provisión única (corre solo si nunca se aplicó). */
+  once?: boolean;
+  /** Trabajo idempotente. Recibe el cliente transaccional de Prisma. */
+  run: (tx: any) => Promise<void>;
+}
+
+// Clave de lock estable a partir del appSlug (31 bits → cabe en bigint de Postgres).
+function advisoryKey(appSlug: string): number {
+  let h = 0;
+  for (let i = 0; i < appSlug.length; i++) h = (Math.imul(31, h) + appSlug.charCodeAt(i)) | 0;
+  return Math.abs(h) % 2147483647;
+}
+
+/**
+ * Ejecuta las unidades de seed en una única transacción bajo advisory lock.
+ * `prisma` es el PrismaClient de la app (debe exponer el modelo `SeedState`).
+ */
+export async function runStartupSeeds(
+  prisma: any,
+  units: SeedUnit[],
+  opts: { appSlug: string; log?: (msg: string) => void },
+): Promise<void> {
+  const log = opts.log ?? ((m: string) => console.log(`[seeds] ${m}`));
+  if (!units.length) return;
+  try {
+    await prisma.$transaction(
+      async (tx: any) => {
+        // Serializa el arranque de todas las instancias contra la misma BD.
+        await tx.$queryRawUnsafe("SELECT pg_advisory_xact_lock($1)", advisoryKey(opts.appSlug));
+        for (const u of units) {
+          const prev = await tx.seedState.findUnique({ where: { name: u.name } });
+          const shouldRun = u.once ? !prev : !prev || prev.version < u.version;
+          if (!shouldRun) continue;
+          await u.run(tx);
+          await tx.seedState.upsert({
+            where: { name: u.name },
+            create: { name: u.name, version: u.version },
+            update: { version: u.version },
+          });
+          log(`applied ${u.name} v${u.version}${u.once ? " (once)" : ""}`);
+        }
+      },
+      { timeout: 120_000, maxWait: 15_000 },
+    );
+  } catch (err) {
+    // No propagamos: el arranque no debe caer por un fallo de seed.
+    log(`ERROR (se reintenta en el próximo arranque): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
