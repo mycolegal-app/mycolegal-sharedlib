@@ -25,6 +25,13 @@ export interface SeedUnit {
   run: (tx: any) => Promise<void>;
 }
 
+/** Resumen del paso de seeds (para el disparo manual desde ops). */
+export interface SeedRunSummary {
+  applied: string[];
+  skipped: string[];
+  error?: string;
+}
+
 // Clave de lock estable a partir del appSlug (31 bits → cabe en bigint de Postgres).
 function advisoryKey(appSlug: string): number {
   let h = 0;
@@ -35,36 +42,50 @@ function advisoryKey(appSlug: string): number {
 /**
  * Ejecuta las unidades de seed en una única transacción bajo advisory lock.
  * `prisma` es el PrismaClient de la app (debe exponer el modelo `SeedState`).
+ * `opts.force` = nombres de unidad a re-ejecutar aunque ya estén aplicadas
+ * (disparo manual desde ops). Devuelve el resumen; NUNCA lanza.
  */
 export async function runStartupSeeds(
   prisma: any,
   units: SeedUnit[],
-  opts: { appSlug: string; log?: (msg: string) => void },
-): Promise<void> {
+  opts: { appSlug: string; force?: string[]; log?: (msg: string) => void },
+): Promise<SeedRunSummary> {
   const log = opts.log ?? ((m: string) => console.log(`[seeds] ${m}`));
-  if (!units.length) return;
+  if (!units.length) return { applied: [], skipped: [] };
+  const forceSet = new Set(opts.force ?? []);
   try {
-    await prisma.$transaction(
-      async (tx: any) => {
+    return await prisma.$transaction(
+      async (tx: any): Promise<SeedRunSummary> => {
         // Serializa el arranque de todas las instancias contra la misma BD.
         await tx.$queryRawUnsafe("SELECT pg_advisory_xact_lock($1)", advisoryKey(opts.appSlug));
+        const applied: string[] = [];
+        const skipped: string[] = [];
         for (const u of units) {
           const prev = await tx.seedState.findUnique({ where: { name: u.name } });
-          const shouldRun = u.once ? !prev : !prev || prev.version < u.version;
-          if (!shouldRun) continue;
+          const forced = forceSet.has(u.name);
+          const shouldRun = forced || (u.once ? !prev : !prev || prev.version < u.version);
+          if (!shouldRun) {
+            skipped.push(u.name);
+            continue;
+          }
           await u.run(tx);
           await tx.seedState.upsert({
             where: { name: u.name },
             create: { name: u.name, version: u.version },
             update: { version: u.version },
           });
-          log(`applied ${u.name} v${u.version}${u.once ? " (once)" : ""}`);
+          applied.push(u.name);
+          log(`applied ${u.name} v${u.version}${u.once ? " (once)" : ""}${forced ? " [forced]" : ""}`);
         }
+        return { applied, skipped };
       },
       { timeout: 120_000, maxWait: 15_000 },
     );
   } catch (err) {
-    // No propagamos: el arranque no debe caer por un fallo de seed.
-    log(`ERROR (se reintenta en el próximo arranque): ${err instanceof Error ? err.message : String(err)}`);
+    // No propagamos: el arranque no debe caer por un fallo de seed. La tx hace
+    // rollback, así que `applied` real es vacío.
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`ERROR (se reintenta en el próximo arranque): ${msg}`);
+    return { applied: [], skipped: [], error: msg };
   }
 }
