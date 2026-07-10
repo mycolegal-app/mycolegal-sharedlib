@@ -82,7 +82,10 @@ export async function runStartupSeeds(
     return await prisma.$transaction(
       async (tx: any): Promise<SeedRunSummary> => {
         // Serializa el arranque de todas las instancias contra la misma BD.
-        await tx.$queryRawUnsafe("SELECT pg_advisory_xact_lock($1)", advisoryKey(opts.appSlug));
+        // `pg_advisory_xact_lock` devuelve `void`; hay que usar $executeRawUnsafe
+        // (no deserializa filas) — con $queryRawUnsafe Prisma falla al mapear el
+        // tipo `void` y el runner entero abortaba (ningún seed llegaba a aplicarse).
+        await tx.$executeRawUnsafe("SELECT pg_advisory_xact_lock($1)", advisoryKey(opts.appSlug));
         const applied: string[] = [];
         const skipped: string[] = [];
         for (const u of units) {
