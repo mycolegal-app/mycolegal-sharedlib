@@ -1,6 +1,6 @@
 {
   "name": "@mycolegal-app/sharedlib",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "type": "module",
   "main": "./index.ts",
   "publishConfig": {
