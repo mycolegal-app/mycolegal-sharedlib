@@ -1,5 +1,12 @@
 # mycolegal-sharedlib — Changelog
 
+##  — Fixes de TEST y mejoras del proceso de suscripción (2026-07-13)
+
+Type: **revision**
+
+
+
+
 ## 0.9.0 — drive: catálogo unificado de ficheros (Unidad de Red) (2026-07-03)
 
 Type: **minor**
