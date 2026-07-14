@@ -42,7 +42,17 @@ const BYPASS_AUTH_ROLES = new Set(['superadmin', 'org_admin']);
 // el notario titular ve todo el despacho. En apps sin `NOTARIO` en su enum
 // AppRole, ningún user tiene ese appRole, así que el `includes` nunca casa y el
 // bypass solo aplica vía `authRole`.
-const BYPASS_APP_ROLES: string[] = ['NOTARIO'];
+//
+// Se aceptan TAMBIÉN las claves del catálogo unificado (#78). Las apps ya las
+// traducen en el boundary (`toLocalAppRole`, app-roles.ts), así que aquí no
+// deberían llegar; se listan como red de seguridad porque el hook cliente
+// (use-is-bypass-user) sí las reconocía y esa divergencia servidor/cliente
+// producía una UI que prometía visibilidad de despacho y una API que la negaba.
+const BYPASS_APP_ROLES: string[] = [
+  'NOTARIO',
+  'ADMINISTRADOR_NOTARIA',
+  'CONTABLE_NOTARIA',
+];
 
 export interface DataScopeAuth {
   authRole: string;
