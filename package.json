@@ -1,6 +1,6 @@
 {
   "name": "@mycolegal-app/sharedlib",
-  "version": "0.9.9",
+  "version": "0.9.10",
   "type": "module",
   "main": "./index.ts",
   "publishConfig": {
@@ -31,7 +31,8 @@
     "seeds.ts",
     "index.ts",
     "tsconfig.json",
-    "VERSION.md"
+    "VERSION.md",
+    "pdf-client.ts"
   ],
   "peerDependencies": {
     "@google-cloud/storage": ">=7",
